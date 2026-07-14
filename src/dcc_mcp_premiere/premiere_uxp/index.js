@@ -1,4 +1,4 @@
-const app = require("premierepro").app;
+const app = require("premierepro");
 const baseUrl = "http://127.0.0.1:47393";
 const token = "dev-token"; // Set the same value as DCC_MCP_PREMIERE_BRIDGE_TOKEN before production use.
 
