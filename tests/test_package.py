@@ -11,7 +11,7 @@ def test_version_metadata_is_synchronized():
     assert manifest["."] == __version__
 
 
-def test_uxp_panel_is_packaged_with_source():
-    panel = Path(__file__).parents[1] / "src" / "dcc_mcp_premiere" / "premiere_uxp"
-    assert (panel / "manifest.json").is_file()
-    assert (panel / "index.js").is_file()
+def test_adapter_uses_shared_adobepy_runtime():
+    root = Path(__file__).parents[1]
+    assert '"adobepy>=0.4.0,<1.0.0"' in (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert not (root / "src" / "dcc_mcp_premiere" / "bridge.py").exists()
