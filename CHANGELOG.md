@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.2.0...v0.3.0) (2026-07-14)
+
+
+### Features
+
+* use shared adobepy runtime ([#2](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/2)) ([e403e06](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/e403e068f75162e15d410c6e8ec05de3fe75bbbb))
+
 ## [0.2.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.1.0...v0.2.0) (2026-07-14)
 
 
