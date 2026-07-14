@@ -1,13 +1,20 @@
-from dcc_mcp_core.skill import skill_entry, skill_success
+from adobe.core.errors import HostScriptError
+from adobe.dcc_mcp import action_result
+from adobe.premiere import Premiere
+from dcc_mcp_core.skill import skill_entry
 
-from dcc_mcp_premiere.bridge import call_bridge
+
+def list_sequences():
+    project = Premiere().project
+    if project is None:
+        raise HostScriptError("Premiere has no active project")
+    sequences = [{"name": sequence.name} for sequence in project.sequences]
+    return {"sequences": sequences, "sequence_count": len(sequences)}
 
 
 @skill_entry
 def main(**_kwargs):
-    return skill_success(
-        "Premiere sequences listed.", **call_bridge("DCC_MCP_PREMIERE", "list_sequences", {})
-    )
+    return action_result("Premiere sequences listed.", list_sequences)
 
 
 if __name__ == "__main__":

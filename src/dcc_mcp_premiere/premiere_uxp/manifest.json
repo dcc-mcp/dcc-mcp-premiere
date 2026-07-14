@@ -1,1 +1,0 @@
-{"id":"com.dccmcp.premiere","name":"DCC MCP Premiere Bridge","version":"0.1.0","manifestVersion":5,"host":[{"app":"premierepro","minVersion":"25.6.0"}],"requiredPermissions":{"network":{"domains":["http://127.0.0.1"]}},"entrypoints":[{"type":"panel","id":"dccMcp","label":"DCC MCP","main":"index.html"}]}
