@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -12,14 +11,14 @@ from dcc_mcp_core.server_base import DccServerBase
 
 from .__version__ import __version__
 
-DEFAULT_PORT = 8765
+DEFAULT_PORT = 0
 _server: Optional["PremiereMcpServer"] = None
 
 
 class PremiereMcpServer(DccServerBase):
     """MCP server whose typed calls are completed by the UXP panel."""
 
-    def __init__(self, port: int = DEFAULT_PORT) -> None:
+    def __init__(self, port: Optional[int] = None) -> None:
         self.broker: Optional[BrokerHandle] = None
         options = DccServerOptions.from_env(
             "premiere",
@@ -51,9 +50,7 @@ class PremiereMcpServer(DccServerBase):
 def start_server(port: Optional[int] = None) -> PremiereMcpServer:
     global _server
     if _server is None or not _server.is_running:
-        _server = PremiereMcpServer(
-            port or int(os.environ.get("DCC_MCP_PREMIERE_PORT", DEFAULT_PORT))
-        )
+        _server = PremiereMcpServer(port)
         _server.register_builtin_actions()
         _server.start()
     return _server
