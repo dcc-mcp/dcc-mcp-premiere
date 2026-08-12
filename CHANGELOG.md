@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.4.0...v0.5.0) (2026-08-12)
+
+
+### Features
+
+* ship production-ready Premiere workflows ([#7](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/7)) ([13952ae](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/13952aed11f62ce6d1242689710fb104c6dd5c92))
+
 ## [0.4.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.3.0...v0.4.0) (2026-07-16)
 
 
