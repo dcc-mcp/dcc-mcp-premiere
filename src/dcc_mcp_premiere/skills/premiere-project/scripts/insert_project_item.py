@@ -1,14 +1,14 @@
-"""List a bounded page of Premiere sequences."""
+"""Insert a project item into a Premiere sequence."""
 
 from dcc_mcp_core.skill import skill_entry
 
-from dcc_mcp_premiere.operations import list_sequences
+from dcc_mcp_premiere.operations import insert_project_item
 from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
 def main(**kwargs):
-    return invoke("Premiere sequences listed.", list_sequences, **kwargs)
+    return invoke("Premiere project item inserted.", insert_project_item, **kwargs)
 
 
 if __name__ == "__main__":

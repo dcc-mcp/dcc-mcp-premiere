@@ -1,20 +1,14 @@
-from adobe.core.errors import HostScriptError
-from adobe.dcc_mcp import action_result
-from adobe.premiere import Premiere
+"""Inspect the active Premiere project through the typed facade."""
+
 from dcc_mcp_core.skill import skill_entry
 
-
-def inspect_project():
-    project = Premiere().project
-    if project is None:
-        raise HostScriptError("Premiere has no active project")
-    sequence = project.active_sequence
-    return {"project_name": project.name, "active_sequence": sequence.name if sequence else None}
+from dcc_mcp_premiere.operations import inspect_project
+from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
 def main(**_kwargs):
-    return action_result("Premiere project inspected.", inspect_project)
+    return invoke("Premiere project inspected.", inspect_project)
 
 
 if __name__ == "__main__":
