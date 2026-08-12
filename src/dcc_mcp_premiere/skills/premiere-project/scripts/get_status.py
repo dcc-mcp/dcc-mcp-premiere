@@ -1,14 +1,14 @@
-"""List a bounded page of Premiere sequences."""
+"""Return typed Premiere bridge and host status."""
 
 from dcc_mcp_core.skill import skill_entry
 
-from dcc_mcp_premiere.operations import list_sequences
+from dcc_mcp_premiere.operations import get_status
 from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
-def main(**kwargs):
-    return invoke("Premiere sequences listed.", list_sequences, **kwargs)
+def main(**_kwargs):
+    return invoke("Premiere status returned.", get_status)
 
 
 if __name__ == "__main__":

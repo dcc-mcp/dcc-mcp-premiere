@@ -1,14 +1,14 @@
-"""List a bounded page of Premiere sequences."""
+"""Import allowlisted media into Premiere."""
 
 from dcc_mcp_core.skill import skill_entry
 
-from dcc_mcp_premiere.operations import list_sequences
+from dcc_mcp_premiere.operations import import_media
 from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
 def main(**kwargs):
-    return invoke("Premiere sequences listed.", list_sequences, **kwargs)
+    return invoke("Premiere media imported.", import_media, **kwargs)
 
 
 if __name__ == "__main__":
