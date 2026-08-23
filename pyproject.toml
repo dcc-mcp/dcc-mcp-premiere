@@ -17,6 +17,9 @@ dependencies = ["adobepy>=0.6.2,<1.0.0", "dcc-mcp-core>=0.19.45,<1.0.0"]
 Homepage = "https://github.com/dcc-mcp/dcc-mcp-premiere"
 Repository = "https://github.com/dcc-mcp/dcc-mcp-premiere"
 
+[project.scripts]
+dcc-mcp-premiere = "dcc_mcp_premiere.cli:main"
+
 [project.optional-dependencies]
 dev = ["build>=1.2", "pytest>=8", "ruff>=0.8", "twine>=6"]
 

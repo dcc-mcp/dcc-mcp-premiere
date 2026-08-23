@@ -130,9 +130,12 @@ class PremiereMcpServer(DccServerBase):
     def start(self, *, install_atexit_hook: bool = True) -> Any:
         if self.is_running:
             return super().start(install_atexit_hook=install_atexit_hook)
+        if not self.adapter_config.token:
+            raise RuntimeError("ADOBEPY_TOKEN must be configured in the environment")
         self.broker = self._broker_factory(
             broker_url=self.adapter_config.broker_url,
             token=self.adapter_config.token,
+            broker_path=self.adapter_config.broker_path,
             timeout=self.adapter_config.timeout,
         )
         try:
@@ -176,6 +179,7 @@ def start_server(
                 config = PremiereConfig(
                     broker_url=broker_url,
                     token=config.token,
+                    broker_path=config.broker_path,
                     target=config.target,
                     timeout=config.timeout,
                     poll_interval=config.poll_interval,

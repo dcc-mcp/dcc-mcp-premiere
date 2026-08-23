@@ -16,7 +16,12 @@ def test_server_uses_host_rpc_for_readiness_and_owned_broker_lifecycle():
     )
     server = PremiereMcpServer(
         gateway_port=0,
-        config=PremiereConfig(timeout=1.0, poll_interval=60.0),
+        config=PremiereConfig(
+            token="token",
+            broker_path="C:/tools/adobepy.exe",
+            timeout=1.0,
+            poll_interval=60.0,
+        ),
         broker_factory=broker_factory,
         readiness_probe=readiness_probe,
     )
@@ -28,7 +33,12 @@ def test_server_uses_host_rpc_for_readiness_and_owned_broker_lifecycle():
     assert server.bridge_status.ready is True
     assert server._readiness.probe.report()["dcc"] is True
     server.update_gateway_metadata.assert_called_once_with(scene="bridge_ready", version="25.6.0")
-    broker_factory.assert_called_once_with(broker_url=None, token=None, timeout=1.0)
+    broker_factory.assert_called_once_with(
+        broker_url=None,
+        token="token",
+        broker_path="C:/tools/adobepy.exe",
+        timeout=1.0,
+    )
 
     with mock.patch("dcc_mcp_premiere.server.DccServerBase.stop"):
         server.stop()
@@ -40,7 +50,7 @@ def test_server_rolls_back_broker_when_base_start_fails():
     broker.stop = mock.Mock()
     server = PremiereMcpServer(
         gateway_port=0,
-        config=PremiereConfig(timeout=1.0, poll_interval=60.0),
+        config=PremiereConfig(token="token", timeout=1.0, poll_interval=60.0),
         broker_factory=mock.Mock(return_value=broker),
         readiness_probe=mock.Mock(return_value=PremiereStatus(False, "offline")),
     )
@@ -57,3 +67,22 @@ def test_server_rolls_back_broker_when_base_start_fails():
 
     broker.stop.assert_called_once_with()
     assert server.broker is None
+
+
+def test_server_refuses_implicit_development_token():
+    broker_factory = mock.Mock()
+    server = PremiereMcpServer(
+        gateway_port=0,
+        config=PremiereConfig(token=None, timeout=1.0, poll_interval=60.0),
+        broker_factory=broker_factory,
+    )
+
+    with mock.patch("dcc_mcp_premiere.server.DccServerBase.start"):
+        try:
+            server.start(install_atexit_hook=False)
+        except RuntimeError as error:
+            assert str(error) == "ADOBEPY_TOKEN must be configured in the environment"
+        else:
+            raise AssertionError("server should fail closed without an operator token")
+
+    broker_factory.assert_not_called()
