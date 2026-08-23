@@ -82,7 +82,8 @@ def test_module_entrypoint_reports_preflight_as_install_sop_json(tmp_path):
     assert result["status"] == "failed"
     assert result["dcc_type"] == "premiere"
     assert result["verify"]["directly_usable"] is False
-    assert result["verify"]["failure_stage"] == "host"
+    expected_stage = "platform" if sys.platform.startswith("linux") else "host"
+    assert result["verify"]["failure_stage"] == expected_stage
     assert result["next_steps"][0]["command"][:3] == [
         "dcc-mcp-premiere",
         "status",
@@ -526,6 +527,28 @@ def test_linux_host_preflight_is_explicit(monkeypatch):
 
     assert raised.value.exit_code == 10
     assert raised.value.stage == "platform"
+
+
+def test_linux_lifecycle_preflight_fails_closed_without_writes(tmp_path, monkeypatch):
+    install_root = tmp_path / "install-root"
+    monkeypatch.setenv("DCC_MCP_PREMIERE_INSTALL_ROOT", str(install_root))
+    monkeypatch.setattr(installer.sys, "platform", "linux")
+
+    report, code, _ = installer.run(
+        [
+            "status",
+            "--json",
+            "--dcc-path",
+            str(tmp_path / "Adobe Premiere Pro"),
+            "--python",
+            sys.executable,
+        ]
+    )
+
+    assert code == 10
+    assert report["verify"]["failure_stage"] == "platform"
+    assert report["verify"]["directly_usable"] is False
+    assert not install_root.exists()
 
 
 def test_windows_version_resource_words_are_decoded_in_file_version_order():
