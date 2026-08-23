@@ -20,6 +20,7 @@ def _positive_float(name: str, default: str, minimum: float) -> float:
 class PremiereConfig:
     broker_url: str | None = None
     token: str | None = None
+    broker_path: str | None = None
     target: str = "default"
     timeout: float = 5.0
     poll_interval: float = 2.0
@@ -29,6 +30,7 @@ class PremiereConfig:
         return cls(
             broker_url=os.getenv("ADOBEPY_BROKER_URL"),
             token=os.getenv("ADOBEPY_TOKEN"),
+            broker_path=os.getenv("ADOBEPY_BROKER_PATH"),
             target=os.getenv("ADOBEPY_TARGET", "default"),
             timeout=_positive_float("DCC_MCP_PREMIERE_BROKER_TIMEOUT_SECS", "5", 0.1),
             poll_interval=_positive_float("DCC_MCP_PREMIERE_BRIDGE_POLL_SECS", "2", 0.25),
