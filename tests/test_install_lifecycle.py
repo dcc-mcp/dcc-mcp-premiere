@@ -12,6 +12,21 @@ from dcc_mcp_premiere.runtime import PremiereStatus
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _metadata_result(adapter_version: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        [],
+        0,
+        json.dumps(
+            {
+                "python": "3.12.0",
+                "core": installer.MIN_CORE_VERSION,
+                "adapter": adapter_version,
+            }
+        ),
+        "",
+    )
+
+
 def _prepare_lifecycle(tmp_path, monkeypatch):
     install_root = tmp_path / "install-root"
     host = tmp_path / "Adobe Premiere Pro.exe"
@@ -31,11 +46,6 @@ def _prepare_lifecycle(tmp_path, monkeypatch):
             "flag",
         ),
     )
-    monkeypatch.setattr(
-        installer,
-        "_target_versions",
-        lambda _python: {"python": "3.12.0", "core": "0.19.91", "adapter": "0.5.0"},
-    )
 
     def build_bridge(_cli, destination):
         (destination / "dist").mkdir(parents=True)
@@ -51,6 +61,38 @@ def _prepare_lifecycle(tmp_path, monkeypatch):
 
     monkeypatch.setattr(installer, "_build_bridge", build_bridge)
     return install_root, host
+
+
+def test_lifecycle_fixture_preserves_production_target_version_probe(tmp_path, monkeypatch):
+    production_probe = installer._target_versions
+
+    _prepare_lifecycle(tmp_path, monkeypatch)
+
+    assert installer._target_versions is production_probe
+
+
+def test_target_versions_accepts_exact_current_release(monkeypatch):
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda *_args, **_kwargs: _metadata_result(installer.__version__),
+    )
+
+    versions = installer._target_versions(Path(sys.executable))
+
+    assert versions["adapter"] == installer.__version__
+
+
+def test_target_versions_rejects_previous_adapter_release(monkeypatch):
+    previous_release = "0.5.0"
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda *_args, **_kwargs: _metadata_result(previous_release),
+    )
+
+    with pytest.raises(installer.InstallFailure, match=f"expected {installer.__version__}"):
+        installer._target_versions(Path(sys.executable))
 
 
 def test_module_entrypoint_reports_preflight_as_install_sop_json(tmp_path):
