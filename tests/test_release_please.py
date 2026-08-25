@@ -18,6 +18,24 @@ PINNED_ACTIONS = {
     "googleapis/release-please-action": "45996ed1f6d02564a971a2fa1b5860e934307cf7",
     "pypa/gh-action-pypi-publish": "dc37677b2e1c63e2034f94d8a5b11f265b73ba33",
 }
+CAPTURE_SOURCE_COMMAND = '''\
+set -euo pipefail
+source_sha="$(git rev-parse HEAD)"
+test -n "$source_sha"
+echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"'''
+VERIFY_PROVENANCE_COMMAND = '''\
+set -euo pipefail
+test -n "$SOURCE_SHA"
+test -n "$ARTIFACT_ID"
+test -n "$ARTIFACT_DIGEST"
+tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG_NAME" --jq .sha)"
+release_target="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG_NAME" --jq .target_commitish)"
+release_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$release_target" --jq .sha)"
+test "$tag_sha" = "$SOURCE_SHA"
+test "$release_sha" = "$SOURCE_SHA"'''
+ATTACH_RELEASE_COMMAND = (
+    VERIFY_PROVENANCE_COMMAND + '\ngh release upload "$TAG_NAME" dist/* --repo "$GITHUB_REPOSITORY"'
+)
 
 
 def test_release_please_tracks_every_version_source() -> None:
@@ -68,22 +86,40 @@ def test_release_workflow_reuses_one_immutable_distribution_artifact() -> None:
     }
     assert jobs["attach-github-release"]["permissions"] == {"contents": "write"}
 
+    assert jobs["build"]["outputs"] == {
+        "source_sha": "${{ steps.capture_source.outputs.source_sha }}",
+        "artifact_id": "${{ steps.upload_distributions.outputs.artifact-id }}",
+        "artifact_digest": "${{ steps.upload_distributions.outputs.artifact-digest }}",
+    }
+
     all_steps = [step for job in jobs.values() for step in job.get("steps", [])]
     build_steps = [step for step in all_steps if step.get("run") == "python -m build"]
     assert len(build_steps) == 1
     assert build_steps[0] in jobs["build"]["steps"]
+
+    capture_source_step = next(
+        step for step in jobs["build"]["steps"] if step.get("id") == "capture_source"
+    )
+    assert capture_source_step == {
+        "name": "Capture exact source commit",
+        "id": "capture_source",
+        "shell": "bash",
+        "run": CAPTURE_SOURCE_COMMAND + "\n",
+    }
 
     upload_step = next(
         step
         for step in jobs["build"]["steps"]
         if step.get("uses", "").startswith("actions/upload-artifact@")
     )
+    assert upload_step["id"] == "upload_distributions"
     assert upload_step["with"] == {
         "name": "release-distributions",
         "path": "dist/",
         "if-no-files-found": "error",
     }
     build_job_steps = jobs["build"]["steps"]
+    assert build_job_steps.index(capture_source_step) < build_job_steps.index(build_steps[0])
     assert build_job_steps.index(build_steps[0]) < build_job_steps.index(upload_step)
 
     download_steps = []
@@ -93,7 +129,10 @@ def test_release_workflow_reuses_one_immutable_distribution_artifact() -> None:
             for step in jobs[job_name]["steps"]
             if step.get("uses", "").startswith("actions/download-artifact@")
         )
-        assert step["with"] == {"name": "release-distributions", "path": "dist/"}
+        assert step["with"] == {
+            "artifact-ids": "${{ needs.build.outputs.artifact_id }}",
+            "path": "dist/",
+        }
         download_steps.append(step)
     assert len(download_steps) == 2
 
@@ -111,17 +150,44 @@ def test_release_workflow_reuses_one_immutable_distribution_artifact() -> None:
         if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
     )
     assert publish_step["with"]["packages-dir"] == "dist/"
-    assert jobs["publish-pypi"]["steps"].index(download_steps[0]) < jobs["publish-pypi"][
-        "steps"
-    ].index(publish_step)
+    provenance_env = {
+        "GH_TOKEN": "${{ github.token }}",
+        "TAG_NAME": tag_expression,
+        "SOURCE_SHA": "${{ needs.build.outputs.source_sha }}",
+        "ARTIFACT_ID": "${{ needs.build.outputs.artifact_id }}",
+        "ARTIFACT_DIGEST": "${{ needs.build.outputs.artifact_digest }}",
+    }
+    assert jobs["publish-pypi"]["env"] == provenance_env
+    verify_pypi_step = next(
+        step
+        for step in jobs["publish-pypi"]["steps"]
+        if step.get("name") == "Verify immutable release provenance"
+    )
+    assert verify_pypi_step == {
+        "name": "Verify immutable release provenance",
+        "shell": "bash",
+        "run": VERIFY_PROVENANCE_COMMAND + "\n",
+    }
+    assert jobs["publish-pypi"]["steps"] == [
+        download_steps[0],
+        verify_pypi_step,
+        publish_step,
+    ]
 
     attach_job = jobs["attach-github-release"]
-    assert attach_job["env"]["TAG_NAME"] == tag_expression
-    attach_command = next(step["run"] for step in attach_job["steps"] if "run" in step)
-    assert attach_command == 'gh release upload "$TAG_NAME" dist/* --repo "$GITHUB_REPOSITORY"'
-    assert attach_job["steps"].index(download_steps[1]) < next(
-        index for index, step in enumerate(attach_job["steps"]) if "run" in step
+    assert attach_job["env"] == provenance_env
+    attach_step = next(
+        step
+        for step in attach_job["steps"]
+        if step.get("name") == "Verify provenance and attach release assets"
     )
+    assert attach_step == {
+        "name": "Verify provenance and attach release assets",
+        "shell": "bash",
+        "run": ATTACH_RELEASE_COMMAND + "\n",
+    }
+    assert attach_job["steps"] == [download_steps[1], attach_step]
+    assert "--clobber" not in attach_step["run"]
 
     pinned_action = re.compile(r"^[^@]+@[0-9a-f]{40}$")
     for step in all_steps:
