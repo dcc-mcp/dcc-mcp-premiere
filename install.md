@@ -25,9 +25,9 @@ Premiere and UXP are unavailable on Linux, so Linux fails preflight without writ
 
 | Adapter | Core | Premiere Pro / UXP | Python | Platform |
 |---|---|---|---|---|
-| 0.5.x | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
-| 0.5.x | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
-| 0.5.x | >=0.19.45,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
+| 0.6.0 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
+| 0.6.0 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
+| 0.6.0 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
 
 `--dcc-path` selects an exact Premiere executable or macOS `.app`. The installer
 reads Windows version resources or `Info.plist`; it never launches the host to
