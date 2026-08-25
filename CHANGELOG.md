@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.5.0...v0.6.0) (2026-08-25)
+
+
+### Features
+
+* add Premiere install lifecycle ([e400736](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/e4007366a8997d13bf2726853f8fe9f5f42740d2))
+
 ## [0.5.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.4.0...v0.5.0) (2026-08-12)
 
 
