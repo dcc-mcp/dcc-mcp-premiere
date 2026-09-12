@@ -11,8 +11,37 @@ not automate Adobe UXP Developer Tool or the Premiere UI.
   `dcc-mcp-core>=0.19.45,<1.0.0`.
 - `ADOBEPY_TOKEN` set in the environment. Reuse the same private local token for
   the broker and UXP plugin; it is never written to reports or receipts.
-- Adobe UXP Developer Tool for the unsigned development-plugin loading step.
+- Adobe UXP Developer Tool only for the adapter-owned manual loading path; it is
+  not required when an approved bridge is linked through the shared CLI.
 - User write access to the DCC-MCP data directory.
+
+## Shared CLI debug-link path
+
+For Internal workstation profiles with an approved prebuilt UXP bridge, the
+shared core CLI can link the bridge without UXP Developer Tool:
+
+```powershell
+dcc-mcp-cli install --dcc-type premiere `
+  --plugin-source <uxp-bridge-root> `
+  --adobe-debug-root <studio-adobe-debug-root> `
+  --execute
+```
+
+The source root must be the bridge root and contain its `manifest.json`. The
+catalog or approved Internal descriptor supplies the Adobe product, extension
+type, plugin ID, and source mapping. The CLI creates an idempotent directory
+link, refuses to replace a different existing target, and verifies the
+manifest. Set
+`DCC_MCP_PLUGIN_SOURCE` and `DCC_MCP_ADOBE_DEBUG_ROOT` in an approved Internal
+profile when those values are stable across workstations. The UXP debug mode is
+still an Adobe host setting and must be enabled once by the workstation image
+or operator.
+
+Restart Premiere after the link is created, then run the normal adapter
+verification below. A link on disk does not prove that Premiere loaded the
+panel or that the bridge is ready. The existing adapter-owned Install SOP
+remains the production path for packaged installs, generated bridge builds,
+upgrades, receipts, and uninstall.
 
 Windows x64 is the complete supported path. The installer acquires only the pinned
 `adobepy` 0.6.2 runtime archive and verifies SHA-256

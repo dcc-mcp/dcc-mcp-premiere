@@ -25,6 +25,29 @@ Pro host. Inspect before editing, identify sequences and project items by the
 IDs returned by the read tools, and save to a new project path before making
 destructive overwrite edits in valuable projects.
 
+## Installation and readiness
+
+When the adapter is not connected, use the adapter-owned install SOP for
+packaged installs and generated bridge builds. For an Internal deployment that
+already has an approved prebuilt UXP bridge, the shared CLI can provide the
+debug-link path:
+
+1. Run `dcc-mcp-cli doctor` to inspect the local CLI and gateway.
+2. Run `dcc-mcp-cli install --dcc-type premiere` with the approved bridge root
+   in `--plugin-source` and the Adobe debug root in `--adobe-debug-root`.
+   Internal deployments may supply them through `DCC_MCP_PLUGIN_SOURCE` and
+   `DCC_MCP_ADOBE_DEBUG_ROOT`. The bridge root must contain `manifest.json`;
+   this adapter repository does not claim to package that generated bridge.
+3. Restart Premiere after the UXP debug link is created.
+4. Run `dcc-mcp-cli list` and
+   `dcc-mcp-cli wait-ready --dcc-type premiere` before loading this skill.
+
+The CLI owns debug-link policy. This skill does not create links, copy plugin
+files, or invoke UXP Developer Tool. A link on disk is not proof that Premiere
+loaded the panel; readiness and a connected session must be observed through
+the CLI and adapter status. The adapter-owned installer remains the canonical
+path for acquiring and generating a bridge.
+
 ## Recommended flow
 
 1. Call `get_status`, then `inspect_project`.
