@@ -24,14 +24,33 @@ python -m pip install dcc-mcp-premiere
 adobepy install-bridge premiere --dest <plugin-dir> --token <non-default-token>
 ```
 
-Load the generated bridge with Adobe UXP Developer Tool in Premiere Pro 25.6
-or later. Set `ADOBEPY_TOKEN` to the same token, start the adapter, then verify
-the connected host through DCC-MCP discovery:
+For development or an Internal deployment with an approved prebuilt UXP bridge,
+the shared CLI can link that bridge into the Adobe debug-plugin directory:
+
+```powershell
+dcc-mcp-cli install --dcc-type premiere `
+  --plugin-source F:\studio\artifacts\premiere-uxp-bridge `
+  --adobe-debug-root F:\studio\adobe-debug `
+  --execute
+```
+
+`DCC_MCP_PLUGIN_SOURCE` and `DCC_MCP_ADOBE_DEBUG_ROOT` can be used in a studio
+profile. The source directory must be the bridge root and contain its
+`manifest.json`; the command does not assume that the adapter repository itself
+contains UXP assets. It creates an idempotent directory link, does not copy the
+bridge, and does not require UXP Developer Tool. Enable Premiere's UXP debug
+mode once, then restart Premiere after the link is created. Premiere Pro 25.6
+or later is required. Set
+`ADOBEPY_TOKEN` to the bridge token, start the adapter, then verify the
+connected host through DCC-MCP discovery:
 
 ```bash
 dcc-mcp-cli wait-ready --dcc-type premiere --timeout-secs 60
 dcc-mcp-cli load-skill premiere-project --dcc-type premiere
 ```
+
+UXP Developer Tool remains a fallback for investigating a host-specific load
+problem.
 
 Each adapter instance uses an OS-assigned port and registers with DCC-MCP
 discovery. Agents should connect through the stable local gateway at
