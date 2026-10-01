@@ -12,6 +12,30 @@ from dcc_mcp_premiere.runtime import PremiereStatus
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _published_schema_const():
+    """The ``schema_version`` value the published Install SOP schema pins."""
+    from dcc_mcp_premiere.install_contract import load_install_sop_schema
+
+    return load_install_sop_schema()["properties"]["schema_version"]["const"]
+
+
+def test_report_schema_version_matches_the_published_schema_const():
+    # ``ARTIFACT_SCHEMA_VERSION`` tracks the schema *artifact* revision and moves
+    # with the resolved core (2 since dcc-mcp-core 0.20.36); the report field
+    # tracks the value the artifact pins via ``properties.schema_version.const``
+    # and independently stays at 1. Assert both sides so a core that drifts the
+    # const breaks here instead of shipping invalid reports.
+    import dcc_mcp_core
+
+    from dcc_mcp_premiere.install_contract import (
+        ARTIFACT_SCHEMA_VERSION,
+        SCHEMA_VERSION,
+    )
+
+    assert SCHEMA_VERSION == _published_schema_const()
+    assert ARTIFACT_SCHEMA_VERSION == dcc_mcp_core.INSTALL_SOP_SCHEMA_VERSION
+
+
 def _metadata_result(adapter_version: str) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(
         [],
@@ -120,7 +144,10 @@ def test_module_entrypoint_reports_preflight_as_install_sop_json(tmp_path):
 
     assert completed.returncode == 10
     result = json.loads(completed.stdout)
-    assert result["schema_version"] == 1
+    # The report field is not the schema *artifact* revision (that one is 2 and
+    # moves with core); it is the value the published schema pins via
+    # `properties.schema_version.const`.
+    assert result["schema_version"] == _published_schema_const()
     assert result["status"] == "failed"
     assert result["dcc_type"] == "premiere"
     assert result["verify"]["directly_usable"] is False
@@ -173,7 +200,7 @@ def test_install_dry_run_is_non_mutating_and_reports_complete_plan(tmp_path, mon
 
     assert code == 0
     assert as_json is True
-    assert report["schema_version"] == 1
+    assert report["schema_version"] == _published_schema_const()
     assert report["status"] == "planned"
     assert report["installation_state"] == "fresh"
     assert report["premiere_version"] == "25.6.0"
@@ -183,6 +210,49 @@ def test_install_dry_run_is_non_mutating_and_reports_complete_plan(tmp_path, mon
     assert report["token_configured"] is True
     assert report["next_steps"][0]["command"][-2:] == ["--json", "--yes"]
     assert not install_root.exists()
+
+
+def test_reports_satisfy_the_published_schema(tmp_path, monkeypatch):
+    from dcc_mcp_core.deployment import validate_install_sop_report
+
+    # The validator runs through the native ABI, which a pure-Python core build
+    # does not ship. The const assertion above stays unconditional; only this
+    # whole-document check is allowed to stand down.
+    native_core = pytest.importorskip("dcc_mcp_core._core")
+    if not callable(getattr(native_core, "_validate_install_sop_report_json", None)):
+        pytest.skip("resolved dcc-mcp-core has no Install SOP validator ABI")
+
+    # Preflight path: a host that is not on disk is refused before anything
+    # mutates, and the refusal is a report too. Run before `_prepare_lifecycle`
+    # stubs `resolve_host`, which is what makes this path resolve at all.
+    report, code, _as_json = installer.run(
+        [
+            "status",
+            "--dcc-path",
+            str(tmp_path / "Adobe Premiere Pro.exe"),
+            "--python",
+            sys.executable,
+            "--json",
+        ]
+    )
+    assert code == 10
+    validate_install_sop_report(report)
+
+    # Plan path: a non-mutating install dry run.
+    _install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    report, code, _as_json = installer.run(
+        [
+            "install",
+            "--dcc-path",
+            str(host),
+            "--python",
+            sys.executable,
+            "--json",
+            "--dry-run",
+        ]
+    )
+    assert code == 0
+    validate_install_sop_report(report)
 
 
 def test_install_status_uninstall_receipt_round_trip(tmp_path, monkeypatch):
