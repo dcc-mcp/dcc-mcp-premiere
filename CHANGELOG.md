@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.0...v0.6.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* emit the Install SOP report schema version, not the artifact revision ([#17](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/17)) ([b3995ff](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/b3995ffa8d2bb8cd3f00c7b1fe1c348e9cfbff5c))
+
+
+### Documentation
+
+* document Adobe debug bridge links ([#15](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/15)) ([a98feab](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/a98feab4238e43b258c89a3f896d8bff02de0349))
+
 ## [0.6.0](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.5.0...v0.6.0) (2026-08-25)
 
 
