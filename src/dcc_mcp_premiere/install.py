@@ -36,7 +36,7 @@ from .install_contract import (
     INSTALL_EXIT_PREFLIGHT,
     INSTALL_EXIT_REQUIRES_RESTART,
     INSTALL_EXIT_VERIFY,
-    INSTALL_SOP_SCHEMA_VERSION,
+    SCHEMA_VERSION,
 )
 from .runtime import probe_premiere
 
@@ -1006,7 +1006,10 @@ def plan(verb: str, dcc_path: Optional[Path], python_path: Optional[Path]) -> di
     versions = _target_versions(python)
     state = _installation_state(root)
     report = {
-        "schema_version": INSTALL_SOP_SCHEMA_VERSION,
+        # The report document's own `schema_version`, pinned by the published
+        # schema's `properties.schema_version.const`. Not the artifact revision
+        # (`ARTIFACT_SCHEMA_VERSION`), which moves with the resolved core.
+        "schema_version": SCHEMA_VERSION,
         "status": "planned",
         "dcc_type": "premiere",
         "verb": verb,
@@ -1066,7 +1069,7 @@ def _failure_result(verb: str, failure: InstallFailure, args: Any) -> dict[str, 
         command.extend(["--python", str(args.python)])
     command.append("--json")
     return {
-        "schema_version": INSTALL_SOP_SCHEMA_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "status": "requires_restart"
         if failure.exit_code == INSTALL_EXIT_REQUIRES_RESTART
         else "failed",
