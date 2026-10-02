@@ -1,8 +1,10 @@
 # Install DCC-MCP Premiere
 
 This runbook installs, verifies, upgrades, and removes the Premiere adapter through
-the agent-first Install SOP v1 contract. The installer plans by default and does
-not automate Adobe UXP Developer Tool or the Premiere UI.
+the agent-first Install SOP contract. Reports are Install SOP document version 1 and
+are validated against the Install SOP schema artifact the resolved `dcc-mcp-core`
+packages (revision 2, `adapter-install-sop-v2.schema.json`). The installer plans by
+default and does not automate Adobe UXP Developer Tool or the Premiere UI.
 
 ## Requirements
 
@@ -74,7 +76,7 @@ dcc-mcp-premiere install --dcc-path "/absolute/path/to/Premiere" --python "/abso
 dcc-mcp-premiere install --dcc-path "/absolute/path/to/Premiere" --python "/absolute/path/to/python" --json --yes
 ```
 
-The result uses schema version 1 and stable exits: `0` success/plan, `10`
+The result uses report schema version 1 and stable exits: `0` success/plan, `10`
 preflight, `20` pinned-runtime acquisition, `30` transaction, `40`
 verify-to-usable, and `50` a proven Windows lock requiring restart. A fresh
 unsigned plugin normally returns exit `40` after the filesystem transaction and
