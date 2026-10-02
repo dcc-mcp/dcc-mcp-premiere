@@ -10,7 +10,7 @@ default and does not automate Adobe UXP Developer Tool or the Premiere UI.
 
 - Adobe Premiere Pro 25.6 or newer with UXP support.
 - Python 3.9 or newer containing `dcc-mcp-premiere` and
-  `dcc-mcp-core>=0.19.45,<1.0.0`.
+  `dcc-mcp-core>=0.20.34,<1.0.0`.
 - `ADOBEPY_TOKEN` set in the environment. Reuse the same private local token for
   the broker and UXP plugin; it is never written to reports or receipts.
 - Adobe UXP Developer Tool only for the adapter-owned manual loading path; it is
@@ -56,9 +56,15 @@ Premiere and UXP are unavailable on Linux, so Linux fails preflight without writ
 
 | Adapter | Core | Premiere Pro / UXP | Python | Platform |
 |---|---|---|---|---|
-| 0.6.1 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
-| 0.6.1 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
-| 0.6.1 <!-- x-release-please-version --> | >=0.19.45,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
+| 0.6.1 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
+| 0.6.1 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
+| 0.6.1 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
+
+The core floor is the lowest release that ships every symbol the adapter imports
+(`capture_bootstrap_errors` since 0.19.90, `deployment.validate_install_sop_report`
+since 0.20.28) *and* the `-v2` Install SOP artifact this adapter pins. A core that
+satisfies the bound but predates a symbol is reported as a preflight failure naming
+the missing symbol rather than as an `ImportError`.
 
 `--dcc-path` selects an exact Premiere executable or macOS `.app`. The installer
 reads Windows version resources or `Info.plist`; it never launches the host to

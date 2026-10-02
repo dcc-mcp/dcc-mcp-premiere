@@ -29,6 +29,7 @@ from dcc_mcp_core.install_lifecycle import (
 )
 
 from .__version__ import __version__
+from .core_compat import MIN_CORE_VERSION
 from .install_contract import (
     INSTALL_EXIT_ACQUIRE,
     INSTALL_EXIT_INSTALL,
@@ -40,7 +41,8 @@ from .install_contract import (
 )
 from .runtime import probe_premiere
 
-MIN_CORE_VERSION = "0.19.45"
+# MIN_CORE_VERSION is imported from `.core_compat`, which derives it from the
+# symbols this adapter imports rather than restating it here.
 MIN_PREMIERE_VERSION = "25.6.0"
 ADOBEPY_RUNTIME_VERSION = "0.6.2"
 ADOBEPY_WINDOWS_URL = (
