@@ -42,7 +42,8 @@ def _packaged_artifact_sha256(schema_id: str) -> str:
 
 def test_report_schema_version_matches_the_published_schema_const():
     # ``ARTIFACT_SCHEMA_VERSION`` tracks the schema *artifact* revision and moves
-    # with the resolved core (2 since dcc-mcp-core 0.20.36); the report field
+    # with the resolved core (2 since dcc-mcp-core 0.20.34; 0.20.33 and earlier
+    # ship the v1 artifact only); the report field
     # tracks the value the artifact pins via ``properties.schema_version.const``
     # and independently stays at 1. Assert both sides so a core that drifts the
     # const breaks here instead of shipping invalid reports.

@@ -73,7 +73,8 @@ def _install_sop_artifact_revision() -> int:
 
 
 # Revision of the published Install SOP schema *artifact*
-# (`adapter-install-sop-vN.schema.json`), 2 since dcc-mcp-core 0.20.36. It is NOT
+# (`adapter-install-sop-vN.schema.json`), 2 since dcc-mcp-core 0.20.34; 0.20.33
+# and earlier ship the v1 artifact only. It is NOT
 # the value of the `schema_version` field that the artifact pins on a report
 # document: that field is a separate, stable counter declared as
 # `properties.schema_version.const` and stays at 1, because artifact revisions
