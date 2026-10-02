@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.1...v0.6.2) (2026-10-02)
+
+
+### Bug Fixes
+
+* anchor the Install SOP contract on the v2 schema artifact ([#18](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/18)) ([42fa05c](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/42fa05c987e52ad4e78ab7cd7b22f3ff8982a50c))
+* declare the dcc-mcp-core floor the code actually needs ([#21](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/21)) ([9caef15](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/9caef15dfdad5b23f882101c70ee1a1ca250ce5a))
+
 ## [0.6.1](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.0...v0.6.1) (2026-10-01)
 
 
