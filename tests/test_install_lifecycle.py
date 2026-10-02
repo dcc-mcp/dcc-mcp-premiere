@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,11 @@ from dcc_mcp_premiere.runtime import PremiereStatus
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# First dcc-mcp-core release that ships the `-v2` Install SOP schema artifact.
+# Earlier releases package `-v1` only, so the v2 integrity anchor below cannot
+# be evaluated against them.
+V2_ARTIFACT_MIN_CORE = (0, 20, 34)
+
 
 def _published_schema_const():
     """The ``schema_version`` value the published Install SOP schema pins."""
@@ -20,14 +26,37 @@ def _published_schema_const():
     return load_install_sop_schema()["properties"]["schema_version"]["const"]
 
 
+def _resolved_core_version() -> tuple[int, ...]:
+    """Version of the ``dcc-mcp-core`` distribution the tests resolved to."""
+    from importlib import metadata
+
+    return tuple(int(part) for part in re.findall(r"\d+", metadata.version("dcc-mcp-core"))[:3])
+
+
+def _expected_artifact_revision() -> int:
+    """Artifact revision the resolved core is expected to publish.
+
+    Hardcoded per core version band so it stays an independent expectation: core
+    publishes 2 from 0.20.34 on and 1 before it.
+    """
+    return 2 if _resolved_core_version() >= V2_ARTIFACT_MIN_CORE else 1
+
+
 def _core_artifact_revision():
     """The artifact revision the resolved core publishes, under either name."""
-    from dcc_mcp_core import deployment
+    try:
+        from dcc_mcp_core import deployment
+    except ImportError:
+        # dcc-mcp-core 0.19.45 -- the floor `pyproject.toml` declares -- has no
+        # `deployment` module at all. Fall back to the revision the v1 artifact
+        # pins, mirroring `install_contract._install_sop_artifact_revision()`.
+        return 1
 
-    revision = getattr(deployment, "INSTALL_SOP_SCHEMA_REVISION", None)
-    if revision is not None:
-        return revision
-    return deployment.INSTALL_SOP_SCHEMA_VERSION
+    for name in ("INSTALL_SOP_SCHEMA_REVISION", "INSTALL_SOP_SCHEMA_VERSION"):
+        revision = getattr(deployment, name, None)
+        if revision is not None:
+            return revision
+    return 1
 
 
 def _packaged_artifact_sha256(schema_id: str) -> str:
@@ -53,7 +82,13 @@ def test_report_schema_version_matches_the_published_schema_const():
     )
 
     assert SCHEMA_VERSION == _published_schema_const()
-    assert ARTIFACT_SCHEMA_VERSION == _core_artifact_revision()
+    # Comparing ``ARTIFACT_SCHEMA_VERSION`` against the constant core publishes
+    # is tautological -- both sides resolve the same attribute -- so pin both
+    # the adapter's resolution and core's published value against the revision
+    # this adapter expects for that core version band instead. A core that
+    # advances the revision then fails here instead of silently changing it.
+    assert ARTIFACT_SCHEMA_VERSION == _expected_artifact_revision()
+    assert _core_artifact_revision() == _expected_artifact_revision()
 
 
 def test_reports_validate_against_the_v2_schema_artifact():
@@ -64,6 +99,12 @@ def test_reports_validate_against_the_v2_schema_artifact():
     # -- while the adapter can still be migrated deliberately -- if core starts
     # shipping another revision. See `docs/guide/adapter-install-sop-v2-migration.md`
     # in dcc-mcp-core.
+    if _resolved_core_version() < V2_ARTIFACT_MIN_CORE:
+        pytest.skip(
+            "resolved dcc-mcp-core <0.20.34 ships no -v2 Install SOP artifact, "
+            "so the v2 integrity anchor does not apply"
+        )
+
     from dcc_mcp_premiere.install_contract import (
         INSTALL_SOP_SCHEMA_ID,
         INSTALL_SOP_SCHEMA_SHA256,
