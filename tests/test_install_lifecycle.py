@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -19,21 +20,61 @@ def _published_schema_const():
     return load_install_sop_schema()["properties"]["schema_version"]["const"]
 
 
+def _core_artifact_revision():
+    """The artifact revision the resolved core publishes, under either name."""
+    from dcc_mcp_core import deployment
+
+    revision = getattr(deployment, "INSTALL_SOP_SCHEMA_REVISION", None)
+    if revision is not None:
+        return revision
+    return deployment.INSTALL_SOP_SCHEMA_VERSION
+
+
+def _packaged_artifact_sha256(schema_id: str) -> str:
+    """sha256 of the schema artifact core ships for ``schema_id``."""
+    from importlib import resources
+
+    filename = schema_id.rsplit("/", 1)[-1]
+    return hashlib.sha256(
+        (resources.files("dcc_mcp_core") / "schemas" / filename).read_bytes()
+    ).hexdigest()
+
+
 def test_report_schema_version_matches_the_published_schema_const():
     # ``ARTIFACT_SCHEMA_VERSION`` tracks the schema *artifact* revision and moves
-    # with the resolved core (2 since dcc-mcp-core 0.20.36); the report field
+    # with the resolved core (2 since dcc-mcp-core 0.20.34; 0.20.33 and earlier
+    # ship the v1 artifact only); the report field
     # tracks the value the artifact pins via ``properties.schema_version.const``
     # and independently stays at 1. Assert both sides so a core that drifts the
     # const breaks here instead of shipping invalid reports.
-    import dcc_mcp_core
-
     from dcc_mcp_premiere.install_contract import (
         ARTIFACT_SCHEMA_VERSION,
         SCHEMA_VERSION,
     )
 
     assert SCHEMA_VERSION == _published_schema_const()
-    assert ARTIFACT_SCHEMA_VERSION == dcc_mcp_core.INSTALL_SOP_SCHEMA_VERSION
+    assert ARTIFACT_SCHEMA_VERSION == _core_artifact_revision()
+
+
+def test_reports_validate_against_the_v2_schema_artifact():
+    # Integrity anchor for the Install SOP contract. Core 0.20.30 rewrote the
+    # `-v1` artifact in place with the same filename and `$id`, which broke every
+    # adapter anchored on those bytes; `-v1` is frozen now and content changes
+    # ship as `-v(N+1)`. Anchor on the packaged v2 artifact instead and fail here
+    # -- while the adapter can still be migrated deliberately -- if core starts
+    # shipping another revision. See `docs/guide/adapter-install-sop-v2-migration.md`
+    # in dcc-mcp-core.
+    from dcc_mcp_premiere.install_contract import (
+        INSTALL_SOP_SCHEMA_ID,
+        INSTALL_SOP_SCHEMA_SHA256,
+        load_install_sop_schema,
+    )
+
+    schema = load_install_sop_schema()
+
+    assert schema["$id"] == INSTALL_SOP_SCHEMA_ID
+    assert schema["$id"].endswith("-v2.schema.json")
+    assert _packaged_artifact_sha256(schema["$id"]) == INSTALL_SOP_SCHEMA_SHA256
 
 
 def _metadata_result(adapter_version: str) -> subprocess.CompletedProcess[str]:
