@@ -9,11 +9,17 @@ import sys
 import time
 from typing import Optional, Sequence
 
-from dcc_mcp_core import capture_bootstrap_errors
+try:
+    # Imported defensively: a core that predates this symbol would otherwise
+    # take the whole CLI down with an ImportError traceback. `main()` converts
+    # the gap into an actionable preflight message instead.
+    from dcc_mcp_core import capture_bootstrap_errors
+except ImportError:  # pragma: no cover - depends on the resolved core version
+    capture_bootstrap_errors = None  # type: ignore[assignment]
 
 from .__version__ import __version__
+from .core_compat import MIN_CORE_VERSION, CoreTooOld, require_core_symbols
 from .install import (
-    MIN_CORE_VERSION,
     VERBS,
     bootstrap_log_dir,
     run,
@@ -72,6 +78,11 @@ def _serve(argv: Sequence[str]) -> int:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     resolved = list(sys.argv[1:] if argv is None else argv)
+    try:
+        require_core_symbols()
+    except CoreTooOld as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.exit_code
     if resolved and resolved[0] in {"-h", "--help"}:
         print("usage: dcc-mcp-premiere {install,status,verify,uninstall,upgrade,serve} [options]")
         return 0
