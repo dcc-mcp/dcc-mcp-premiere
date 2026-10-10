@@ -10,7 +10,7 @@ allowed-tools: Python
 metadata:
   dcc-mcp:
     dcc: premiere
-    version: "0.6.2"  # x-release-please-version
+    version: "0.6.3"  # x-release-please-version
     layer: domain
     stage: scene
     search-hint: "premiere project media sequence timeline marker export"

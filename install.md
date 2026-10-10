@@ -56,9 +56,9 @@ Premiere and UXP are unavailable on Linux, so Linux fails preflight without writ
 
 | Adapter | Core | Premiere Pro / UXP | Python | Platform |
 |---|---|---|---|---|
-| 0.6.2 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
-| 0.6.2 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
-| 0.6.2 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
+| 0.6.3 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | Windows x64 |
+| 0.6.3 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | >=25.6.0 / manifest v5 | >=3.9 | macOS, operator-provided adobepy CLI |
+| 0.6.3 <!-- x-release-please-version --> | >=0.20.34,<1.0.0 | unavailable | >=3.9 | Linux unsupported |
 
 The core floor is the lowest release that ships every symbol the adapter imports
 (`capture_bootstrap_errors` since 0.19.90, `deployment.validate_install_sop_report`
