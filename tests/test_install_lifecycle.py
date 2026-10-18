@@ -288,7 +288,7 @@ def test_install_dry_run_is_non_mutating_and_reports_complete_plan(tmp_path, mon
     assert report["premiere_version"] == "25.6.0"
     assert report["uxp_manifest_version"] == 5
     assert report["uxp_min_version"] == "25.6.0"
-    assert report["adobepy_runtime_version"] == "0.6.2"
+    assert report["adobepy_runtime_version"] == "0.12.0"
     assert report["token_configured"] is True
     assert report["next_steps"][0]["command"][-2:] == ["--json", "--yes"]
     assert not install_root.exists()

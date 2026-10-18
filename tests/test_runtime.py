@@ -53,3 +53,32 @@ def test_probe_contains_no_raw_method_and_contains_all_operation_namespaces():
     }
     assert "raw.evalJs" not in flattened
     assert {"project", "projectItem", "sequence", "encoder", "export"} <= set(REQUIRED_METHODS)
+
+
+def test_published_adobepy_sdk_performs_real_version_rpc():
+    import importlib.metadata
+
+    from adobe.core import BrokerClient
+
+    assert importlib.metadata.version("adobepy") == "0.12.0"
+    requests = []
+
+    class TransportClient(BrokerClient):
+        def _get_json(self, path):
+            assert path == "/v1/capabilities"
+            return [{"target": "default", "capabilities": complete_capabilities()}]
+
+        def _post_json(self, path, payload):
+            requests.append((path, payload))
+            assert path == "/v1/rpc"
+            assert (payload["host"], payload["namespace"], payload["method"]) == (
+                "premiere",
+                "app",
+                "getVersion",
+            )
+            return {"result": "25.6.0"}
+
+    status = probe_premiere(client=TransportClient(token="test-token"))
+    assert status.ready is True
+    assert status.version == "25.6.0"
+    assert len(requests) == 1

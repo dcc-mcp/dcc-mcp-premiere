@@ -46,11 +46,17 @@ remains the production path for packaged installs, generated bridge builds,
 upgrades, receipts, and uninstall.
 
 Windows x64 is the complete supported path. The installer acquires only the pinned
-`adobepy` 0.6.2 runtime archive and verifies SHA-256
-`9ef9abb5e034359f12e9ce248b0030e38d34c76df343eb2713f18036068719a7`.
-macOS host discovery is supported, but adobepy 0.6.2 publishes no macOS runtime
+`adobepy` 0.12.0 runtime archive and verifies SHA-256
+`b7c4923b474f01447f6f05666a8bd48c0beb4e0b7409b2842e1b506d1f12b48a`.
+macOS host discovery is supported, but adobepy 0.12.0 publishes no macOS runtime
 bundle; set `DCC_MCP_PREMIERE_ADOBEPY` to an operator-installed compatible CLI.
 Premiere and UXP are unavailable on Linux, so Linux fails preflight without writes.
+
+The Python SDK and installer runtime are paired at adobepy 0.12.0. Compatibility
+tests use the published SDK's real Premiere version-RPC path with synthetic
+transport responses. The existing readiness probe checks capabilities and a
+version RPC; this dependency migration does not add exact host/broker identity
+attestation or claim licensed live Premiere validation.
 
 ## Supported versions
 

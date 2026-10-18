@@ -44,12 +44,12 @@ from .runtime import probe_premiere
 # MIN_CORE_VERSION is imported from `.core_compat`, which derives it from the
 # symbols this adapter imports rather than restating it here.
 MIN_PREMIERE_VERSION = "25.6.0"
-ADOBEPY_RUNTIME_VERSION = "0.6.2"
+ADOBEPY_RUNTIME_VERSION = "0.12.0"
 ADOBEPY_WINDOWS_URL = (
     "https://github.com/dcc-mcp/adobepy/releases/download/"
-    "adobepy-v0.6.2/adobepy-0.6.2-windows-x64.zip"
+    "adobepy-v0.12.0/adobepy-0.12.0-windows-x64.zip"
 )
-ADOBEPY_WINDOWS_SHA256 = "9ef9abb5e034359f12e9ce248b0030e38d34c76df343eb2713f18036068719a7"
+ADOBEPY_WINDOWS_SHA256 = "b7c4923b474f01447f6f05666a8bd48c0beb4e0b7409b2842e1b506d1f12b48a"
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_ARCHIVE_FILES = 1_000
 MAX_EXTRACTED_BYTES = 128 * 1024 * 1024
