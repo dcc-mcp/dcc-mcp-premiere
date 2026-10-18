@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.2...v0.6.3) (2026-10-18)
+
+
+### Bug Fixes
+
+* **deps:** pair adapter with adobepy 0.12.0 ([#27](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/27)) ([01bc213](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/01bc213e03795b4c693c5dc90b95cc5e2bcc1287))
+
+
+### Documentation
+
+* **readme:** add the generated DCC-MCP host matrix pointer ([#22](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/22)) ([5284ab2](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/5284ab29e847fbe62eec6b062201b16f296667ed))
+* refresh the generated DCC-MCP host matrix pointer ([#26](https://github.com/dcc-mcp/dcc-mcp-premiere/issues/26)) ([236bfaa](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/236bfaa4f62862ce3f0c7f747e58bfe803a14e27))
+
 ## [0.6.2](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.1...v0.6.2) (2026-10-02)
 
 
