@@ -15,7 +15,7 @@ def test_version_metadata_is_synchronized():
 def test_adapter_uses_current_shared_adobepy_runtime():
     root = Path(__file__).parents[1]
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert '"adobepy>=0.6.2,<1.0.0"' in pyproject
+    assert '"adobepy==0.12.0"' in pyproject
     assert not (root / "src" / "dcc_mcp_premiere" / "bridge.py").exists()
 
 
@@ -94,3 +94,20 @@ def test_start_server_defers_port_resolution_to_core(monkeypatch):
     server_module.stop_server()
 
     assert ports == [0, None]
+
+
+def test_runtime_archive_is_pinned_to_the_published_sdk_release():
+    from dcc_mcp_premiere.install import (
+        ADOBEPY_RUNTIME_VERSION,
+        ADOBEPY_WINDOWS_SHA256,
+        ADOBEPY_WINDOWS_URL,
+    )
+
+    assert ADOBEPY_RUNTIME_VERSION == "0.12.0"
+    assert ADOBEPY_WINDOWS_URL == (
+        "https://github.com/dcc-mcp/adobepy/releases/download/"
+        "adobepy-v0.12.0/adobepy-0.12.0-windows-x64.zip"
+    )
+    assert ADOBEPY_WINDOWS_SHA256 == (
+        "b7c4923b474f01447f6f05666a8bd48c0beb4e0b7409b2842e1b506d1f12b48a"
+    )
