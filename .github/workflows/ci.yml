@@ -10,27 +10,50 @@ permissions:
 
 jobs:
   test:
-    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    name: ${{ matrix.os }} / py${{ matrix.python-version }} / core ${{ matrix.core-version }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.9", "3.11", "3.12"]
-        exclude:
-          - os: windows-latest
-            python-version: "3.9"
-          - os: macos-latest
-            python-version: "3.9"
+        python-version: ["3.9", "3.12"]
+        # The declared lower bound and the newest release: the bound has to hold
+        # for the oldest core pip may resolve, not only for today's latest.
+        core-version: ["floor", "latest"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
-      - run: pytest
-      - run: ruff check src tests tools
-      - run: ruff format --check src tests tools
+      - name: Pin core to the declared floor
+        if: matrix.core-version == 'floor'
+        run: python tools/install_core_floor.py
+      - name: Resolve the latest core
+        if: matrix.core-version == 'latest'
+        run: python -m pip install --upgrade dcc-mcp-core
+      - name: Report the resolved core
+        run: python -c "import importlib.metadata as m; print('dcc-mcp-core', m.version('dcc-mcp-core'))"
+      - name: Install lifecycle smoke
+        run: python -m pytest tests/test_install_lifecycle.py -q
+      - run: python -m pytest -q
+      - run: python -m ruff check src tests tools
+      - run: python -m ruff format --check src tests tools
       - run: python tools/lint_skills.py
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip build twine
       - run: python -m build
       - run: python -m twine check dist/*
+      - name: Verify lifecycle payload
+        run: |
+          python -c "import glob, zipfile; p=glob.glob('dist/*.whl')[0]; z=zipfile.ZipFile(p); required={'dcc_mcp_premiere/__main__.py','dcc_mcp_premiere/cli.py','dcc_mcp_premiere/install.py','dcc_mcp_premiere/install_contract.py'}; missing=required-set(z.namelist()); assert not missing, missing"

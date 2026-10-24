@@ -1,20 +1,14 @@
-from adobe.core.errors import HostScriptError
-from adobe.dcc_mcp import action_result
-from adobe.premiere import Premiere
+"""Save the active Premiere project."""
+
 from dcc_mcp_core.skill import skill_entry
 
-
-def save_project():
-    project = Premiere().project
-    if project is None:
-        raise HostScriptError("Premiere has no active project")
-    project.save()
-    return {"saved": True}
+from dcc_mcp_premiere.operations import save_project
+from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
 def main(**_kwargs):
-    return action_result("Premiere project saved.", save_project)
+    return invoke("Premiere project saved.", save_project)
 
 
 if __name__ == "__main__":

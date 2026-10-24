@@ -1,64 +1,202 @@
 # dcc-mcp-premiere
 
 <p align="center">
-  <img src="docs/assets/dcc-mcp-premiere.svg" alt="DCC-MCP · PREMIERE" width="600">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dcc-mcp-premiere-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/dcc-mcp-premiere.svg">
+    <img src="docs/assets/dcc-mcp-premiere.svg" alt="DCC-MCP · PREMIERE PRO" width="600">
+  </picture>
 </p>
+
+Typed DCC-MCP control for Adobe Premiere Pro through the shared `adobepy`
+broker and Adobe's UXP runtime. The adapter exposes bounded project, media,
+timeline, marker, save, frame-export, and AME queue operations. It deliberately
+does not expose raw JavaScript, `evalJs`, shell commands, or arbitrary UXP calls.
+
+![Premiere Pro typed project and timeline workflow](docs/images/premiere-showcase.webp)
+
+_Illustrative workflow generated with OpenAI ImageGen from the retained source in `docs/images/sources`; it is not a Premiere Pro screenshot or host-validation artifact._
+
+<!-- dcc-mcp-coverage-pointer:start -->
+<!-- Generated from dcc-mcp-catalog.yml by scripts/generate_adapter_pointer.py in dcc-mcp/dcc-mcp-core. Do not edit by hand. -->
+## Part of the DCC-MCP host matrix
+
+**dcc-mcp-premiere** — Adobe Premiere Pro adapter for DCC-MCP.
+
+It is one of **47 host adapters** in the DCC-MCP catalog. Every adapter speaks the same
+MCP protocol and builds on the same core runtime contract; each one exposes the tools
+its own host needs on top of that.
+
+- [All host adapters and install metadata](https://dcc-mcp.github.io/ecosystem)
+- [Host matrix on the core README](https://github.com/dcc-mcp/dcc-mcp-core#readme)
+- [Showcase](https://dcc-mcp.github.io/showcase)
+
+This block is generated from the catalog entry in
+[`dcc-mcp-catalog.yml`](https://github.com/dcc-mcp/dcc-mcp-core/blob/main/dcc-mcp-catalog.yml).
+Re-run the generator after changing the catalog.
+<!-- dcc-mcp-coverage-pointer:end -->
 
 ## Agent workflow
 
-AI agents should use the shared gateway through `dcc-mcp-cli`; IDE users may
-continue to use the MCP endpoint. Prefer typed skills and tools over raw scripts.
+Shell-capable agents should use the shared gateway through `dcc-mcp-cli`;
+IDE users may continue to use the MCP endpoint. Prefer typed skills and tools
+over raw scripts.
 
-### Install or update the CLI
+If the CLI is missing, ask the user before downloading or installing it. Follow
+the [official CLI bootstrap and installation guide](https://github.com/dcc-mcp/dcc-mcp-core/blob/v0.20.47/docs/guide/getting-started.md#installation),
+using its bundled Skill helper or a reviewed local installer. Do not pipe remote
+scripts into a shell or bypass the machine's script execution policy.
 
-`dcc-mcp-cli` is the preferred control path for every shell-capable agent. If
-it is missing, ask the user before installing the latest official release:
-
-```bash
-# Linux/macOS
-curl -fsSL https://raw.githubusercontent.com/dcc-mcp/dcc-mcp-core/main/scripts/install-cli.sh | sh
-
-# Windows PowerShell
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/dcc-mcp/dcc-mcp-core/main/scripts/install-cli.ps1 | iex"
-```
-
-Keep an official build current through the release manifest:
+Keep an official CLI installation current through the release manifest:
 
 ```bash
 dcc-mcp-cli update check
+# Only after user confirmation:
 dcc-mcp-cli update apply
 ```
 
-`update apply` downloads and stages the latest CLI for the next launch. It
-does not update a running `dcc-mcp-server`; update that server in its own
-environment.
+`update apply` stages the CLI for its next launch; it does not update or restart
+a running `dcc-mcp-server`. Update that server in its own environment.
+
+Replace `TASK_DESCRIPTION`, `TOOL_SLUG`, `TASK_ID`, and the example JSON with
+the task, discovered tool, stable task session identifier, and arguments from
+that tool's schema before running these examples:
 
 ```bash
 dcc-mcp-cli dcc-types
 dcc-mcp-cli list
-dcc-mcp-cli search --query "<task>" --dcc-type premiere
-dcc-mcp-cli describe <tool-slug>
-dcc-mcp-cli call <tool-slug> --json '{"key":"value"}'
+dcc-mcp-cli search --query "TASK_DESCRIPTION" --dcc-type premiere
+dcc-mcp-cli describe TOOL_SLUG
+dcc-mcp-cli call TOOL_SLUG --json '{"key":"value"}' --require-gateway --agent-session-id TASK_ID
 ```
 
 `dcc-types` reports release-catalog support; `list` reports live sessions. If a
-tool belongs to an inactive progressive skill, call `dcc-mcp-cli load-skill <skill-name> --dcc-type premiere` before retrying. For post-task improvement,
-attach a stable session id with `--meta-json`, query `dcc-mcp-cli stats --range 24h --session-id <task-id>`, then pass the bounded evidence to the
-`review_skill_improvement` prompt from `dcc-mcp-skills-creator`.
+tool belongs to the inactive `premiere-project` skill, load it with
+`dcc-mcp-cli load-skill premiere-project --dcc-type premiere`, then search again.
 
-
-MCP adapter for Adobe Premiere Pro, built on the shared `adobepy` broker, UXP bridge, and typed facade.
+For post-task review, query only the bounded statistics for that task session:
 
 ```bash
-pip install dcc-mcp-premiere
+dcc-mcp-cli stats --range 24h --dcc-type premiere --session-id TASK_ID
 ```
 
-Install the shared bridge with `adobepy install-bridge premiere --dest <plugin-dir> --token <token>`, load it with Adobe UXP Developer Tool in Premiere Pro 25.6 or later, then start the adapter. Each adapter instance uses an OS-assigned port and registers it for CLI discovery. Connect through the stable gateway at `http://127.0.0.1:9765/mcp`; set `DCC_MCP_PREMIERE_PORT` only when a fixed direct endpoint is required.
+Use this evidence to review Skill improvements, not as proof of native Premiere
+acceptance. The real-host acceptance boundary below remains unchanged.
 
-Set `ADOBEPY_TOKEN` to the same non-default token used when installing the bridge.
+## Install
 
-## Tools
+```bash
+python -m pip install dcc-mcp-premiere
+adobepy install-bridge premiere --dest <plugin-dir> --token <non-default-token>
+```
 
-- `premiere-project.inspect_project`
-- `premiere-project.list_sequences`
-- `premiere-project.save_project`
+For development or an Internal deployment with an approved prebuilt UXP bridge,
+the shared CLI can link that bridge into the Adobe debug-plugin directory:
+
+```powershell
+dcc-mcp-cli install --dcc-type premiere `
+  --plugin-source F:\studio\artifacts\premiere-uxp-bridge `
+  --adobe-debug-root F:\studio\adobe-debug `
+  --execute
+```
+
+`DCC_MCP_PLUGIN_SOURCE` and `DCC_MCP_ADOBE_DEBUG_ROOT` can be used in a studio
+profile. The source directory must be the bridge root and contain its
+`manifest.json`; the command does not assume that the adapter repository itself
+contains UXP assets. It creates an idempotent directory link, does not copy the
+bridge, and does not require UXP Developer Tool. Enable Premiere's UXP debug
+mode once, then restart Premiere after the link is created. Premiere Pro 25.6
+or later is required. Set
+`ADOBEPY_TOKEN` to the bridge token, start the adapter, then verify the
+connected host through DCC-MCP discovery:
+
+```bash
+dcc-mcp-cli wait-ready --dcc-type premiere --timeout-secs 60
+dcc-mcp-cli load-skill premiere-project --dcc-type premiere
+```
+
+UXP Developer Tool remains a fallback for investigating a host-specific load
+problem.
+
+Each adapter instance uses an OS-assigned port and registers with DCC-MCP
+discovery. Agents should connect through the stable local gateway at
+`http://127.0.0.1:9765/mcp`. Set `DCC_MCP_PREMIERE_PORT` only for a deliberately
+fixed direct endpoint.
+
+## Typed tools
+
+Inspection:
+
+- `get_status`
+- `inspect_project`
+- `list_sequences`
+- `inspect_sequence`
+- `list_project_items`
+- `list_selected_clips`
+- `list_encoder_presets`
+
+Project and timeline authoring:
+
+- `create_bin`
+- `import_media`
+- `create_sequence`
+- `insert_project_item`
+- `overwrite_project_item`
+- `create_marker`
+
+Persistence and export:
+
+- `save_project`
+- `save_project_as`
+- `queue_sequence_export`
+- `export_frame`
+
+List and scan operations are paginated and bounded. Imports accept at most 100
+files, with per-file and aggregate byte limits. Track indices, marker text,
+frame dimensions, and output extensions are validated before invoking the host.
+AME export reports `queued=true`; completion must be verified separately.
+
+## Safe local paths
+
+The adapter resolves paths before calling Premiere and confines them to:
+
+- `DCC_MCP_PREMIERE_ALLOWED_INPUT_ROOTS` for imported media
+- `DCC_MCP_PREMIERE_ALLOWED_OUTPUT_ROOTS` for `.prproj` and exported media
+- `DCC_MCP_PREMIERE_ALLOWED_PRESET_ROOTS` for `.sqpreset` and `.epr` files
+
+Each variable uses the platform path separator and defaults to the current
+user's home directory. Existing outputs require `overwrite=true`; missing
+parent directories require `create_parents=true`. Verified synchronous outputs
+include byte count and SHA-256.
+
+## Real-host acceptance
+
+Automated tests use contract-compatible facade fakes; they are not represented
+as live Premiere proof. With a disposable project open and the UXP bridge
+connected, configure the three allowlists and run:
+
+```bash
+set DCC_MCP_PREMIERE_SMOKE_MEDIA=C:\path\to\media.mp4
+set DCC_MCP_PREMIERE_SMOKE_ROOT=C:\path\to\writable-evidence
+python tools/live_premiere_smoke.py
+```
+
+The smoke script uses `dcc-mcp-cli` for readiness, skill loading, and every
+typed call. It imports media, authors and inspects a sequence, adds a marker,
+saves a verified project copy, exports a verified frame, and prints hashes.
+Set `DCC_MCP_PREMIERE_SMOKE_EPR` to an allowlisted `.epr` file to include an AME
+queue test.
+
+## Development
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest -q
+python -m ruff check src tests tools
+python -m ruff format --check src tests tools
+python tools/lint_skills.py
+python -m build
+python -m twine check dist/*
+```
+
+See `docs/architecture.md` for ownership, readiness, and security boundaries.

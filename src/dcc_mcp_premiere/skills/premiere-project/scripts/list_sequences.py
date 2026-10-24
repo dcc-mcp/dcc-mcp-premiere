@@ -1,20 +1,14 @@
-from adobe.core.errors import HostScriptError
-from adobe.dcc_mcp import action_result
-from adobe.premiere import Premiere
+"""List a bounded page of Premiere sequences."""
+
 from dcc_mcp_core.skill import skill_entry
 
-
-def list_sequences():
-    project = Premiere().project
-    if project is None:
-        raise HostScriptError("Premiere has no active project")
-    sequences = [{"name": sequence.name} for sequence in project.sequences]
-    return {"sequences": sequences, "sequence_count": len(sequences)}
+from dcc_mcp_premiere.operations import list_sequences
+from dcc_mcp_premiere.skill_support import invoke
 
 
 @skill_entry
-def main(**_kwargs):
-    return action_result("Premiere sequences listed.", list_sequences)
+def main(**kwargs):
+    return invoke("Premiere sequences listed.", list_sequences, **kwargs)
 
 
 if __name__ == "__main__":

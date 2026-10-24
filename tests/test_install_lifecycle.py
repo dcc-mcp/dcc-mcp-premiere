@@ -1,0 +1,749 @@
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from dcc_mcp_premiere import install as installer
+from dcc_mcp_premiere.runtime import PremiereStatus
+
+ROOT = Path(__file__).resolve().parents[1]
+
+# First dcc-mcp-core release that ships the `-v2` Install SOP schema artifact.
+# Earlier releases package `-v1` only, so the v2 integrity anchor below cannot
+# be evaluated against them.
+V2_ARTIFACT_MIN_CORE = (0, 20, 34)
+
+
+def _published_schema_const():
+    """The ``schema_version`` value the published Install SOP schema pins."""
+    from dcc_mcp_premiere.install_contract import load_install_sop_schema
+
+    return load_install_sop_schema()["properties"]["schema_version"]["const"]
+
+
+def _resolved_core_version() -> tuple[int, ...]:
+    """Version of the ``dcc-mcp-core`` distribution the tests resolved to."""
+    from importlib import metadata
+
+    return tuple(int(part) for part in re.findall(r"\d+", metadata.version("dcc-mcp-core"))[:3])
+
+
+def _expected_artifact_revision() -> int:
+    """Artifact revision the resolved core is expected to publish.
+
+    Hardcoded per core version band so it stays an independent expectation: core
+    publishes 2 from 0.20.34 on and 1 before it.
+    """
+    return 2 if _resolved_core_version() >= V2_ARTIFACT_MIN_CORE else 1
+
+
+def _core_artifact_revision():
+    """The artifact revision the resolved core publishes, under either name."""
+    try:
+        from dcc_mcp_core import deployment
+    except ImportError:
+        # dcc-mcp-core 0.19.45 -- the floor `pyproject.toml` declares -- has no
+        # `deployment` module at all. Fall back to the revision the v1 artifact
+        # pins, mirroring `install_contract._install_sop_artifact_revision()`.
+        return 1
+
+    for name in ("INSTALL_SOP_SCHEMA_REVISION", "INSTALL_SOP_SCHEMA_VERSION"):
+        revision = getattr(deployment, name, None)
+        if revision is not None:
+            return revision
+    return 1
+
+
+def _packaged_artifact_sha256(schema_id: str) -> str:
+    """sha256 of the schema artifact core ships for ``schema_id``."""
+    from importlib import resources
+
+    filename = schema_id.rsplit("/", 1)[-1]
+    return hashlib.sha256(
+        (resources.files("dcc_mcp_core") / "schemas" / filename).read_bytes()
+    ).hexdigest()
+
+
+def test_report_schema_version_matches_the_published_schema_const():
+    # ``ARTIFACT_SCHEMA_VERSION`` tracks the schema *artifact* revision and moves
+    # with the resolved core (2 since dcc-mcp-core 0.20.34; 0.20.33 and earlier
+    # ship the v1 artifact only); the report field
+    # tracks the value the artifact pins via ``properties.schema_version.const``
+    # and independently stays at 1. Assert both sides so a core that drifts the
+    # const breaks here instead of shipping invalid reports.
+    from dcc_mcp_premiere.install_contract import (
+        ARTIFACT_SCHEMA_VERSION,
+        SCHEMA_VERSION,
+    )
+
+    assert SCHEMA_VERSION == _published_schema_const()
+    # Comparing ``ARTIFACT_SCHEMA_VERSION`` against the constant core publishes
+    # is tautological -- both sides resolve the same attribute -- so pin both
+    # the adapter's resolution and core's published value against the revision
+    # this adapter expects for that core version band instead. A core that
+    # advances the revision then fails here instead of silently changing it.
+    assert ARTIFACT_SCHEMA_VERSION == _expected_artifact_revision()
+    assert _core_artifact_revision() == _expected_artifact_revision()
+
+
+def test_reports_validate_against_the_v2_schema_artifact():
+    # Integrity anchor for the Install SOP contract. Core 0.20.30 rewrote the
+    # `-v1` artifact in place with the same filename and `$id`, which broke every
+    # adapter anchored on those bytes; `-v1` is frozen now and content changes
+    # ship as `-v(N+1)`. Anchor on the packaged v2 artifact instead and fail here
+    # -- while the adapter can still be migrated deliberately -- if core starts
+    # shipping another revision. See `docs/guide/adapter-install-sop-v2-migration.md`
+    # in dcc-mcp-core.
+    if _resolved_core_version() < V2_ARTIFACT_MIN_CORE:
+        pytest.skip(
+            "resolved dcc-mcp-core <0.20.34 ships no -v2 Install SOP artifact, "
+            "so the v2 integrity anchor does not apply"
+        )
+
+    from dcc_mcp_premiere.install_contract import (
+        INSTALL_SOP_SCHEMA_ID,
+        INSTALL_SOP_SCHEMA_SHA256,
+        load_install_sop_schema,
+    )
+
+    schema = load_install_sop_schema()
+
+    assert schema["$id"] == INSTALL_SOP_SCHEMA_ID
+    assert schema["$id"].endswith("-v2.schema.json")
+    assert _packaged_artifact_sha256(schema["$id"]) == INSTALL_SOP_SCHEMA_SHA256
+
+
+def _metadata_result(adapter_version: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        [],
+        0,
+        json.dumps(
+            {
+                "python": "3.12.0",
+                "core": installer.MIN_CORE_VERSION,
+                "adapter": adapter_version,
+            }
+        ),
+        "",
+    )
+
+
+def _prepare_lifecycle(tmp_path, monkeypatch):
+    install_root = tmp_path / "install-root"
+    host = tmp_path / "Adobe Premiere Pro.exe"
+    host.write_bytes(b"premiere")
+    adobepy = tmp_path / "adobepy.exe"
+    adobepy.write_bytes(b"runtime")
+    monkeypatch.setenv("DCC_MCP_PREMIERE_INSTALL_ROOT", str(install_root))
+    monkeypatch.setenv("DCC_MCP_PREMIERE_ADOBEPY", str(adobepy))
+    monkeypatch.setenv("ADOBEPY_TOKEN", "test-token-that-must-never-be-reported")
+    monkeypatch.setattr(
+        installer,
+        "resolve_host",
+        lambda _value: installer.HostInstall(
+            host,
+            "25.6.0",
+            tmp_path / "profile" / "25.0",
+            "flag",
+        ),
+    )
+
+    def build_bridge(_cli, destination):
+        (destination / "dist").mkdir(parents=True)
+        (destination / "manifest.json").write_text(
+            '{"host":{"app":"PR","minVersion":"25.6.0"}}',
+            encoding="utf-8",
+        )
+        (destination / "dist" / "main.js").write_text("bridge", encoding="utf-8")
+        (destination / "adobepy.config.js").write_text(
+            "token=test-token-that-must-never-be-reported",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(installer, "_build_bridge", build_bridge)
+    return install_root, host
+
+
+def test_lifecycle_fixture_preserves_production_target_version_probe(tmp_path, monkeypatch):
+    production_probe = installer._target_versions
+
+    _prepare_lifecycle(tmp_path, monkeypatch)
+
+    assert installer._target_versions is production_probe
+
+
+def test_target_versions_accepts_exact_current_release(monkeypatch):
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda *_args, **_kwargs: _metadata_result(installer.__version__),
+    )
+
+    versions = installer._target_versions(Path(sys.executable))
+
+    assert versions["adapter"] == installer.__version__
+
+
+def test_target_versions_rejects_previous_adapter_release(monkeypatch):
+    previous_release = "0.5.0"
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda *_args, **_kwargs: _metadata_result(previous_release),
+    )
+
+    with pytest.raises(installer.InstallFailure, match=f"expected {installer.__version__}"):
+        installer._target_versions(Path(sys.executable))
+
+
+def test_module_entrypoint_reports_preflight_as_install_sop_json(tmp_path):
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT / "src")
+    missing_host = tmp_path / "Adobe Premiere Pro.exe"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dcc_mcp_premiere",
+            "status",
+            "--json",
+            "--dcc-path",
+            str(missing_host),
+            "--python",
+            sys.executable,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 10
+    result = json.loads(completed.stdout)
+    # The report field is not the schema *artifact* revision (that one is 2 and
+    # moves with core); it is the value the published schema pins via
+    # `properties.schema_version.const`.
+    assert result["schema_version"] == _published_schema_const()
+    assert result["status"] == "failed"
+    assert result["dcc_type"] == "premiere"
+    assert result["verify"]["directly_usable"] is False
+    expected_stage = "platform" if sys.platform.startswith("linux") else "host"
+    assert result["verify"]["failure_stage"] == expected_stage
+    assert result["next_steps"][0]["command"][:3] == [
+        "dcc-mcp-premiere",
+        "status",
+        "--dcc-path",
+    ]
+
+
+def test_console_script_exposes_the_standard_lifecycle_surface():
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'dcc-mcp-premiere = "dcc_mcp_premiere.cli:main"' in pyproject
+
+
+def test_module_entrypoint_help_lists_the_lifecycle_without_error():
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT / "src")
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "dcc_mcp_premiere", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 0
+    for verb in ("install", "status", "verify", "uninstall", "upgrade", "serve"):
+        assert verb in completed.stdout
+
+
+def test_install_dry_run_is_non_mutating_and_reports_complete_plan(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+
+    report, code, as_json = installer.run(
+        [
+            "install",
+            "--dcc-path",
+            str(host),
+            "--python",
+            sys.executable,
+            "--json",
+            "--dry-run",
+        ]
+    )
+
+    assert code == 0
+    assert as_json is True
+    assert report["schema_version"] == _published_schema_const()
+    assert report["status"] == "planned"
+    assert report["installation_state"] == "fresh"
+    assert report["premiere_version"] == "25.6.0"
+    assert report["uxp_manifest_version"] == 5
+    assert report["uxp_min_version"] == "25.6.0"
+    assert report["adobepy_runtime_version"] == "0.12.0"
+    assert report["token_configured"] is True
+    assert report["next_steps"][0]["command"][-2:] == ["--json", "--yes"]
+    assert not install_root.exists()
+
+
+def test_reports_satisfy_the_published_schema(tmp_path, monkeypatch):
+    from dcc_mcp_core.deployment import validate_install_sop_report
+
+    # The validator runs through the native ABI, which a pure-Python core build
+    # does not ship. The const assertion above stays unconditional; only this
+    # whole-document check is allowed to stand down.
+    native_core = pytest.importorskip("dcc_mcp_core._core")
+    if not callable(getattr(native_core, "_validate_install_sop_report_json", None)):
+        pytest.skip("resolved dcc-mcp-core has no Install SOP validator ABI")
+
+    # Preflight path: a host that is not on disk is refused before anything
+    # mutates, and the refusal is a report too. Run before `_prepare_lifecycle`
+    # stubs `resolve_host`, which is what makes this path resolve at all.
+    report, code, _as_json = installer.run(
+        [
+            "status",
+            "--dcc-path",
+            str(tmp_path / "Adobe Premiere Pro.exe"),
+            "--python",
+            sys.executable,
+            "--json",
+        ]
+    )
+    assert code == 10
+    validate_install_sop_report(report)
+
+    # Plan path: a non-mutating install dry run.
+    _install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    report, code, _as_json = installer.run(
+        [
+            "install",
+            "--dcc-path",
+            str(host),
+            "--python",
+            sys.executable,
+            "--json",
+            "--dry-run",
+        ]
+    )
+    assert code == 0
+    validate_install_sop_report(report)
+
+
+def test_install_status_uninstall_receipt_round_trip(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+
+    installed, install_code, _ = installer.run(["install", *common, "--yes"])
+    status, status_code, _ = installer.run(["status", *common])
+    removed, remove_code, _ = installer.run(["uninstall", *common, "--yes"])
+    absent, absent_code, _ = installer.run(["uninstall", *common, "--yes"])
+
+    assert install_code == status_code == remove_code == absent_code == 0
+    assert installed["verify"]["directly_usable"] is True
+    assert status["installation_state"] == "current"
+    assert removed["status"] == absent["status"] == "ok"
+    assert not installer.plugin_path(install_root).exists()
+    assert not installer.receipt_path(install_root).exists()
+
+
+def test_receipt_failure_restores_previous_plugin_and_receipt(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, code, _ = installer.run(["install", *common, "--yes"])
+    assert code == 0
+    marker = installer.plugin_path(install_root) / "previous.txt"
+    marker.write_text("keep me", encoding="utf-8")
+    old_receipt = installer.receipt_path(install_root).read_bytes()
+
+    def reject_receipt(*_args):
+        raise OSError("receipt write failed")
+
+    monkeypatch.setattr(installer, "_write_json_atomic", reject_receipt)
+    report, failed_code, _ = installer.run(["upgrade", *common, "--yes"])
+
+    assert failed_code == 30
+    assert report["verify"]["failure_stage"] == "install"
+    assert marker.read_text(encoding="utf-8") == "keep me"
+    assert installer.receipt_path(install_root).read_bytes() == old_receipt
+
+
+def test_install_repairs_a_receipted_missing_plugin_tree(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, install_code, _ = installer.run(["install", *common, "--yes"])
+    assert install_code == 0
+    removed = installer.safe_remove_tree(installer.plugin_path(install_root))
+    assert removed["success"] is True
+
+    planned, plan_code, _ = installer.run(["install", *common, "--dry-run"])
+    repaired, repair_code, _ = installer.run(["install", *common, "--yes"])
+
+    assert plan_code == repair_code == 0
+    assert planned["installation_state"] == "repair"
+    assert repaired["steps"][-1]["previous_state"] == "repair"
+    assert installer.plugin_path(install_root).is_dir()
+
+
+def test_failed_stage_commit_restores_previous_plugin_and_receipt(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, code, _ = installer.run(["install", *common, "--yes"])
+    assert code == 0
+    marker = installer.plugin_path(install_root) / "previous.txt"
+    marker.write_text("keep me", encoding="utf-8")
+    old_receipt = installer.receipt_path(install_root).read_bytes()
+    real_replace = installer.os.replace
+
+    def reject_stage(source, destination):
+        source_path = Path(source)
+        if source_path.name == "uxp-plugin" and Path(destination) == installer.plugin_path(
+            install_root
+        ):
+            raise OSError("stage commit failed")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(installer.os, "replace", reject_stage)
+    report, failed_code, _ = installer.run(["upgrade", *common, "--yes"])
+
+    assert failed_code == 30
+    assert report["verify"]["failure_stage"] == "install"
+    assert marker.read_text(encoding="utf-8") == "keep me"
+    assert installer.receipt_path(install_root).read_bytes() == old_receipt
+
+
+def test_install_and_receipt_never_report_environment_token(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    report, code, _ = installer.run(
+        ["install", "--dcc-path", str(host), "--python", sys.executable, "--json", "--yes"]
+    )
+
+    secret = "test-token-that-must-never-be-reported"
+    assert code == 0
+    assert secret not in json.dumps(report)
+    assert secret not in installer.receipt_path(install_root).read_text(encoding="utf-8")
+
+
+def test_verify_requires_uxp_session_then_typed_readiness(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, code, _ = installer.run(["install", *common, "--yes"])
+    assert code == 0
+    monkeypatch.undo()
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(installer, "_python_import_check", lambda _python: {"success": True})
+    monkeypatch.setattr(installer, "_bootstrap_check", lambda _root: {"success": True})
+    monkeypatch.setattr(
+        installer,
+        "probe_premiere",
+        lambda **_kwargs: PremiereStatus(True, version="25.6.0"),
+    )
+    observed = {}
+
+    def ready(**kwargs):
+        observed.update(kwargs)
+        return {"success": True, "status": "ready"}
+
+    monkeypatch.setattr(installer, "wait_for_sidecar_ready", ready)
+    verified, verify_code, _ = installer.run(["verify", *common])
+
+    assert verify_code == 0
+    assert verified["verify"]["directly_usable"] is True
+    assert observed["dcc_type"] == "premiere"
+    assert observed["probe_tool"] == "premiere_project__get_status"
+
+
+def test_missing_uxp_session_fails_closed_without_restart_claim(tmp_path, monkeypatch):
+    _install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": False,
+            "failure_stage": "uxp_session",
+            "failure_reason": "Premiere bridge session is not connected",
+        },
+    )
+    report, code, _ = installer.run(
+        ["verify", "--dcc-path", str(host), "--python", sys.executable, "--json"]
+    )
+
+    assert code == 40
+    assert report["status"] == "failed"
+    assert report["verify"]["failure_stage"] == "uxp_session"
+    assert len(report["next_steps"]) == 1
+    assert report["next_steps"][0]["id"] == "load-uxp-plugin-and-verify"
+    assert report["status"] != "requires_restart"
+
+
+def test_uninstall_refuses_unknown_unreceipted_plugin(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    target = installer.plugin_path(install_root)
+    target.mkdir(parents=True)
+    (target / "user-file.txt").write_text("preserve", encoding="utf-8")
+
+    report, code, _ = installer.run(
+        [
+            "uninstall",
+            "--dcc-path",
+            str(host),
+            "--python",
+            sys.executable,
+            "--json",
+            "--yes",
+        ]
+    )
+
+    assert code == 10
+    assert report["verify"]["failure_stage"] in {"partial", "receipt"}
+    assert (target / "user-file.txt").read_text(encoding="utf-8") == "preserve"
+
+
+def test_uninstall_uses_receipted_host_identity_when_host_is_gone(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    _, install_code, _ = installer.run(
+        [
+            "install",
+            "--dcc-path",
+            str(host),
+            "--python",
+            sys.executable,
+            "--json",
+            "--yes",
+        ]
+    )
+    assert install_code == 0
+
+    def reject_host_discovery(_value):
+        raise AssertionError("receipt-only uninstall must not rediscover a removed host")
+
+    monkeypatch.setattr(installer, "resolve_host", reject_host_discovery)
+    removed, remove_code, _ = installer.run(
+        ["uninstall", "--python", sys.executable, "--json", "--yes"]
+    )
+
+    assert remove_code == 0
+    assert removed["host_source"] == "receipt"
+    assert not installer.plugin_path(install_root).exists()
+
+
+def _mark_runtime_as_receipted(install_root: Path, monkeypatch) -> Path:
+    runtime = installer.runtime_path(install_root)
+    cli = runtime / "bin" / "adobepy.exe"
+    cli.parent.mkdir(parents=True)
+    cli.write_bytes(b"owned runtime")
+    runtime_files = installer._file_manifest(runtime)
+    receipt_file = installer.receipt_path(install_root)
+    receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+    receipt.update(
+        {
+            "runtime_owned": True,
+            "runtime_path": str(runtime),
+            "runtime_files": runtime_files,
+            "runtime_digest": installer._manifest_digest(runtime_files),
+            "adobepy_cli": str(cli),
+        }
+    )
+    installer._write_json_atomic(receipt_file, receipt)
+    monkeypatch.setenv("DCC_MCP_PREMIERE_ADOBEPY", str(cli))
+    return cli
+
+
+def test_status_detects_tampering_in_receipted_runtime(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, install_code, _ = installer.run(["install", *common, "--yes"])
+    assert install_code == 0
+    cli = _mark_runtime_as_receipted(install_root, monkeypatch)
+    assert installer._installation_state(install_root) == "current"
+
+    cli.write_bytes(b"tampered runtime")
+
+    assert installer._installation_state(install_root) == "repair"
+
+
+def test_upgrade_preserves_receipted_runtime_ownership(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, install_code, _ = installer.run(["install", *common, "--yes"])
+    assert install_code == 0
+    cli = _mark_runtime_as_receipted(install_root, monkeypatch)
+
+    _, upgrade_code, _ = installer.run(["upgrade", *common, "--yes"])
+
+    receipt = json.loads(installer.receipt_path(install_root).read_text(encoding="utf-8"))
+    assert upgrade_code == 0
+    assert receipt["runtime_owned"] is True
+    assert Path(receipt["adobepy_cli"]) == cli
+
+
+def test_uninstall_preserves_modified_receipted_runtime(tmp_path, monkeypatch):
+    install_root, host = _prepare_lifecycle(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        installer,
+        "verify_install",
+        lambda *_args: {
+            "directly_usable": True,
+            "failure_stage": None,
+            "failure_reason": None,
+        },
+    )
+    common = ["--dcc-path", str(host), "--python", sys.executable, "--json"]
+    _, install_code, _ = installer.run(["install", *common, "--yes"])
+    assert install_code == 0
+    cli = _mark_runtime_as_receipted(install_root, monkeypatch)
+    cli.write_bytes(b"operator-modified runtime")
+
+    report, uninstall_code, _ = installer.run(["uninstall", *common, "--yes"])
+
+    assert uninstall_code == 10
+    assert report["verify"]["failure_stage"] == "receipt"
+    assert cli.is_file()
+    assert installer.receipt_path(install_root).is_file()
+
+
+def test_bridge_stage_rejects_an_incompatible_uxp_manifest(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADOBEPY_TOKEN", "test-token")
+    destination = tmp_path / "bridge"
+    (destination / "dist").mkdir(parents=True)
+    (destination / "manifest.json").write_text(
+        '{"manifestVersion":4,"host":{"app":"PR","minVersion":"25.6.0"}}',
+        encoding="utf-8",
+    )
+    (destination / "dist" / "main.js").write_text("bridge", encoding="utf-8")
+    (destination / "adobepy.config.js").write_text("config", encoding="utf-8")
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
+    )
+
+    with pytest.raises(installer.InstallFailure, match="manifest v5") as raised:
+        installer._build_bridge(tmp_path / "adobepy.exe", destination)
+
+    assert raised.value.exit_code == 30
+    assert raised.value.stage == "bridge"
+
+
+def test_linux_host_preflight_is_explicit(monkeypatch):
+    monkeypatch.setattr(installer.sys, "platform", "linux")
+
+    with pytest.raises(installer.InstallFailure, match="not available on Linux") as raised:
+        installer.resolve_host(None)
+
+    assert raised.value.exit_code == 10
+    assert raised.value.stage == "platform"
+
+
+def test_linux_lifecycle_preflight_fails_closed_without_writes(tmp_path, monkeypatch):
+    install_root = tmp_path / "install-root"
+    monkeypatch.setenv("DCC_MCP_PREMIERE_INSTALL_ROOT", str(install_root))
+    monkeypatch.setattr(installer.sys, "platform", "linux")
+
+    report, code, _ = installer.run(
+        [
+            "status",
+            "--json",
+            "--dcc-path",
+            str(tmp_path / "Adobe Premiere Pro"),
+            "--python",
+            sys.executable,
+        ]
+    )
+
+    assert code == 10
+    assert report["verify"]["failure_stage"] == "platform"
+    assert report["verify"]["directly_usable"] is False
+    assert not install_root.exists()
+
+
+def test_windows_version_resource_words_are_decoded_in_file_version_order():
+    assert installer._format_windows_version(25 << 16 | 6, 3 << 16 | 17) == "25.6.3.17"

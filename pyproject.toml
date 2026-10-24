@@ -4,18 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dcc-mcp-premiere"
-version = "0.4.0"
+version = "0.6.3"
 description = "MCP adapter for Adobe Premiere Pro"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "loonghao", email = "hal.long@outlook.com" }]
 classifiers = ["Development Status :: 3 - Alpha", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3.9", "Programming Language :: Python :: 3.10", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12"]
-dependencies = ["adobepy>=0.4.0,<1.0.0", "dcc-mcp-core>=0.19.45,<1.0.0"]
+dependencies = ["adobepy==0.12.0", "dcc-mcp-core>=0.20.34,<1.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/dcc-mcp/dcc-mcp-premiere"
 Repository = "https://github.com/dcc-mcp/dcc-mcp-premiere"
+
+[project.scripts]
+dcc-mcp-premiere = "dcc_mcp_premiere.cli:main"
 
 [project.optional-dependencies]
 dev = ["build>=1.2", "pytest>=8", "ruff>=0.8", "twine>=6"]
@@ -27,8 +30,12 @@ premiere = "dcc_mcp_premiere:PremiereMcpServer"
 packages = ["src/dcc_mcp_premiere"]
 artifacts = ["src/dcc_mcp_premiere/skills/**"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/**/*.png", "docs/**/*.svg", "docs/**/*.webp"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py39"
