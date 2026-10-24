@@ -36,6 +36,53 @@ This block is generated from the catalog entry in
 Re-run the generator after changing the catalog.
 <!-- dcc-mcp-coverage-pointer:end -->
 
+## Agent workflow
+
+Shell-capable agents should use the shared gateway through `dcc-mcp-cli`;
+IDE users may continue to use the MCP endpoint. Prefer typed skills and tools
+over raw scripts.
+
+If the CLI is missing, ask the user before downloading or installing it. Follow
+the [official CLI bootstrap and installation guide](https://github.com/dcc-mcp/dcc-mcp-core/blob/v0.20.47/docs/guide/getting-started.md#installation),
+using its bundled Skill helper or a reviewed local installer. Do not pipe remote
+scripts into a shell or bypass the machine's script execution policy.
+
+Keep an official CLI installation current through the release manifest:
+
+```bash
+dcc-mcp-cli update check
+# Only after user confirmation:
+dcc-mcp-cli update apply --yes
+```
+
+`update apply` stages the CLI for its next launch; it does not update or restart
+a running `dcc-mcp-server`. Update that server in its own environment.
+
+Replace `TASK_DESCRIPTION`, `TOOL_SLUG`, `TASK_ID`, and the example JSON with
+the task, discovered tool, stable task session identifier, and arguments from
+that tool's schema before running these examples:
+
+```bash
+dcc-mcp-cli dcc-types
+dcc-mcp-cli list
+dcc-mcp-cli search --query "TASK_DESCRIPTION" --dcc-type premiere
+dcc-mcp-cli describe TOOL_SLUG
+dcc-mcp-cli call TOOL_SLUG --json '{"key":"value"}' --require-gateway --agent-session-id TASK_ID
+```
+
+`dcc-types` reports release-catalog support; `list` reports live sessions. If a
+tool belongs to the inactive `premiere-project` skill, load it with
+`dcc-mcp-cli load-skill premiere-project --dcc-type premiere`, then search again.
+
+For post-task review, query only the bounded statistics for that task session:
+
+```bash
+dcc-mcp-cli stats --range 24h --dcc-type premiere --session-id TASK_ID
+```
+
+Use this evidence to review Skill improvements, not as proof of native Premiere
+acceptance. The real-host acceptance boundary below remains unchanged.
+
 ## Install
 
 ```bash
