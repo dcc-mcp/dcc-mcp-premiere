@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.3...v0.6.4) (2026-10-24)
+
+
+### Documentation
+
+* align agent workflow and branding ([ded5b9c](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/ded5b9c18e7a58a0bad3760e06dc0c4f329f9cb8))
+* pass approved confirmation to CLI updates ([c938d82](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/c938d822ce3024c7d74bbcaa905fb91853b6cf88))
+* reconcile agent workflow with current main ([cbbd38c](https://github.com/dcc-mcp/dcc-mcp-premiere/commit/cbbd38cd6beffd0a2b3f75b13d3dfcbf3f410d12))
+
 ## [0.6.3](https://github.com/dcc-mcp/dcc-mcp-premiere/compare/v0.6.2...v0.6.3) (2026-10-18)
 
 
