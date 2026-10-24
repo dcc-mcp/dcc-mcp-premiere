@@ -52,7 +52,7 @@ Keep an official CLI installation current through the release manifest:
 ```bash
 dcc-mcp-cli update check
 # Only after user confirmation:
-dcc-mcp-cli update apply
+dcc-mcp-cli update apply --yes
 ```
 
 `update apply` stages the CLI for its next launch; it does not update or restart
