@@ -21,6 +21,17 @@ jobs:
         # The declared lower bound and the newest release: the bound has to hold
         # for the oldest core pip may resolve, not only for today's latest.
         core-version: ["floor", "latest"]
+        # Legacy Python builds are published for Ubuntu 24.04, not 26.04.
+        exclude:
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.9"
+            core-version: "floor"
+          - os: ubuntu-24.04
+            python-version: "3.9"
+            core-version: "latest"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
